@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCatalogStore } from '../../stores/catalog-store.ts';
 import { useProductStore } from '../../stores/product-store.ts';
 import { useUiStore } from '../../stores/ui-store.ts';
+import { productRepository } from '../../db/repositories/product-repository.ts';
 import { generateMatrix } from '../../services/matrix-generator.ts';
 import { generateStructuredGarmentBarcode, generateUniqueBarcode } from '../../services/barcode-service.ts';
 import { formatDimensionCode } from '../../services/sku-generator.ts';
@@ -60,6 +61,66 @@ export const ProductMatrixView: React.FC = () => {
   // Base price & custom model name
   const [basePrice, setBasePrice] = useState<string>('450,000');
   const [customModelName, setCustomModelName] = useState<string>('');
+
+  // Existing products tracking to prevent duplicate usage of product names (کاراکتر/مدل)
+  const [usedCharacterIds, setUsedCharacterIds] = useState<Set<string>>(new Set());
+  const [usedProductNames, setUsedProductNames] = useState<Set<string>>(new Set());
+  const [hideUsedCharacters, setHideUsedCharacters] = useState<boolean>(false);
+
+  const loadExistingUsage = async () => {
+    try {
+      const all = await productRepository.getAllProducts();
+      const charIds = new Set<string>();
+      const names = new Set<string>();
+
+      for (const p of all) {
+        if (p.characterId) {
+          charIds.add(p.characterId);
+        }
+        if (p.characterName) {
+          names.add(p.characterName.trim().toLowerCase());
+        }
+        if (p.name) {
+          names.add(p.name.trim().toLowerCase());
+          // Extract text inside parentheses: e.g. "تیشرت چاپدار (باب اسفنجی)" -> "باب اسفنجی"
+          const match = p.name.match(/\(([^)]+)\)/);
+          if (match && match[1]) {
+            names.add(match[1].trim().toLowerCase());
+          }
+        }
+      }
+
+      setUsedCharacterIds(charIds);
+      setUsedProductNames(names);
+    } catch (err) {
+      console.error('Failed to load existing products usage in matrix:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadExistingUsage();
+  }, []);
+
+  // Remove already used characters if they happen to be in selectedCharacterIds
+  useEffect(() => {
+    if (usedCharacterIds.size > 0 || usedProductNames.size > 0) {
+      setSelectedCharacterIds((prev) =>
+        prev.filter((id) => {
+          const charObj = characters.find((c) => c.id === id);
+          if (!charObj) return false;
+          const isUsed =
+            usedCharacterIds.has(id) ||
+            usedProductNames.has(charObj.name.trim().toLowerCase());
+          return !isUsed;
+        })
+      );
+    }
+  }, [usedCharacterIds, usedProductNames, characters]);
+
+  const isCustomModelNameUsed = useMemo(() => {
+    if (!customModelName.trim()) return false;
+    return usedProductNames.has(customModelName.trim().toLowerCase());
+  }, [customModelName, usedProductNames]);
 
   // Generated matrix results
   const [combinations, setCombinations] = useState<MatrixCombination[]>([]);
@@ -205,20 +266,36 @@ export const ProductMatrixView: React.FC = () => {
   }, [sizes]);
 
   const characterItems = useMemo(() => {
-    return ensureUniqueItems(
-      characters
-        .filter((c) => c.isActive)
-        .map((c) => {
-          const numCode = formatDimensionCode(c.code, 'character');
-          return {
-            id: c.id,
-            name: c.name,
-            code: numCode,
-            badge: `کد: ${numCode}`,
-          };
-        })
-    );
-  }, [characters]);
+    const raw = characters
+      .filter((c) => c.isActive)
+      .map((c) => {
+        const numCode = formatDimensionCode(c.code, 'character');
+        const cleanName = c.name.trim().toLowerCase();
+        const isUsed = usedCharacterIds.has(c.id) || usedProductNames.has(cleanName);
+
+        return {
+          id: c.id,
+          name: c.name,
+          code: numCode,
+          disabled: isUsed,
+          disabledReason: 'قبلاً استفاده شده',
+          badge: isUsed ? 'قبلاً استفاده شده' : `کد: ${numCode}`,
+        };
+      });
+
+    const deduped = ensureUniqueItems(raw);
+    if (hideUsedCharacters) {
+      return deduped.filter((item) => !item.disabled);
+    }
+    return deduped;
+  }, [characters, usedCharacterIds, usedProductNames, hideUsedCharacters]);
+
+  const usedCharactersCount = useMemo(() => {
+    return characters.filter((c) => {
+      const cleanName = c.name.trim().toLowerCase();
+      return usedCharacterIds.has(c.id) || usedProductNames.has(cleanName);
+    }).length;
+  }, [characters, usedCharacterIds, usedProductNames]);
 
   // Estimated Cartesian Product Count
   const estimatedCount = useMemo(() => {
@@ -315,6 +392,14 @@ export const ProductMatrixView: React.FC = () => {
       showToast({
         type: 'warning',
         message: 'لطفاً حداقل یکی از مشخصه‌ها (رنگ، سایز، یا ویژگی) را برای تنوع انتخاب کنید',
+      });
+      return;
+    }
+
+    if (isCustomModelNameUsed) {
+      showToast({
+        type: 'error',
+        message: `نام کالا «${customModelName}» قبلاً برای تولید محصول استفاده شده و دیگر قابل انتخاب نیست. لطفاً نام متفاوتی وارد کنید.`,
       });
       return;
     }
@@ -451,7 +536,6 @@ export const ProductMatrixView: React.FC = () => {
         selectedRowIds.includes(c.tempId) &&
         !c.isDuplicateSku &&
         !c.isDuplicateBarcode &&
-        !c.isDuplicateName &&
         c.name.trim() &&
         c.sku.trim()
     );
@@ -464,10 +548,24 @@ export const ProductMatrixView: React.FC = () => {
       return;
     }
 
+    // Deduplicate within rowsToSave by SKU and barcode to prevent collision
+    const seenBatchSkus = new Set<string>();
+    const seenBatchBarcodes = new Set<string>();
+    const uniqueRowsToSave = rowsToSave.filter((r) => {
+      const s = r.sku.trim();
+      const b = r.barcode.trim();
+      if (seenBatchSkus.has(s) || seenBatchBarcodes.has(b)) {
+        return false;
+      }
+      seenBatchSkus.add(s);
+      seenBatchBarcodes.add(b);
+      return true;
+    });
+
     setIsBulkSaving(true);
     try {
       const now = Date.now();
-      const productsToSave: Product[] = rowsToSave.map((r, index) => ({
+      const productsToSave: Product[] = uniqueRowsToSave.map((r, index) => ({
         id: `prod-${now}-${index}-${Math.random().toString(36).substring(2, 7)}`,
         categoryId: r.categoryId,
         subcategoryId: r.subcategoryId,
@@ -489,6 +587,7 @@ export const ProductMatrixView: React.FC = () => {
 
       await bulkSaveProducts(productsToSave);
       await refreshCount();
+      await loadExistingUsage();
 
       showToast({
         type: 'success',
@@ -499,11 +598,11 @@ export const ProductMatrixView: React.FC = () => {
       setCombinations([]);
       setHasGenerated(false);
       setActiveTab('products');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to bulk save products:', err);
       showToast({
         type: 'error',
-        message: 'خطا در ذخیره‌سازی گروهی محصولات در IndexedDB',
+        message: err?.message ? `خطا در ذخیره‌سازی: ${err.message}` : 'خطا در ذخیره‌سازی گروهی محصولات در دیتابیس',
       });
     } finally {
       setIsBulkSaving(false);
@@ -671,14 +770,32 @@ export const ProductMatrixView: React.FC = () => {
           />
 
           {/* 8. نام محصول / شخصیت کارتونی (Character) - 1000+ items! */}
-          <MultiSelectDropdown
-            label="۸. نام محصول (بیش از ۱۰۰۰ شخصیت کارتونی)"
-            placeholder="جستجو در بین ۱۰۰۰+ شخصیت کارتونی و انیمیشنی..."
-            items={characterItems}
-            selectedIds={selectedCharacterIds}
-            onChange={setSelectedCharacterIds}
-            badgeColor="cyan"
-          />
+          <div className="flex flex-col gap-1">
+            <MultiSelectDropdown
+              label="۸. نام محصول (بیش از ۱۰۰۰ شخصیت کارتونی)"
+              placeholder="جستجو در بین ۱۰۰۰+ شخصیت کارتونی و انیمیشنی..."
+              items={characterItems}
+              selectedIds={selectedCharacterIds}
+              onChange={setSelectedCharacterIds}
+              badgeColor="cyan"
+            />
+            {usedCharactersCount > 0 && (
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 px-1 bg-amber-50/60 rounded border border-amber-200/50 py-1">
+                <span className="text-amber-800 font-medium">
+                  {usedCharactersCount.toLocaleString('fa-IR')} نام قبلاً استفاده شده و قفل هستند
+                </span>
+                <label className="flex items-center gap-1 cursor-pointer hover:text-slate-800 select-none">
+                  <input
+                    type="checkbox"
+                    checked={hideUsedCharacters}
+                    onChange={(e) => setHideUsedCharacters(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span>مخفی کردن</span>
+                </label>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Barcode Structure Explainer, Model Name & Base Price Row */}
@@ -714,7 +831,12 @@ export const ProductMatrixView: React.FC = () => {
               onChange={(e) => setCustomModelName(e.target.value)}
               placeholder="مثال: تدی، خرسی، بهاره..."
               className="text-xs"
-              helperText="الگو: [گروه اصلی] [ویژگی] ([نام کالا])"
+              helperText={
+                isCustomModelNameUsed
+                  ? '⚠️ این نام قبلاً برای تولید محصول استفاده شده و دیگر قابل انتخاب نیست!'
+                  : 'الگو: [گروه اصلی] [ویژگی] ([نام کالا])'
+              }
+              error={isCustomModelNameUsed ? 'نام کالا تکراری و غیرمجاز است' : undefined}
             />
           </div>
 

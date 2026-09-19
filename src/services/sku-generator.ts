@@ -22,7 +22,7 @@ export interface SkuComponents {
   character?: CharacterItem;
 }
 
-export const DEFAULT_SKU_TEMPLATE = '{category}-{attribute}-{season}-{color}-{gender}-{size}';
+export const DEFAULT_SKU_TEMPLATE = '{category}-{attribute}-{season}-{color}-{gender}-{size}-{character}';
 
 /**
  * Normalizes a code for SKU and matrix use - strictly numeric digits only!
@@ -108,15 +108,15 @@ export function generateSku(
   template: string = DEFAULT_SKU_TEMPLATE
 ): string {
   const tokenValues: Record<string, string> = {
-    '{category}': formatDimensionCode(components.category?.code, 'category'),
-    '{subcategory}': formatDimensionCode(components.subcategory?.code, 'subcategory'),
-    '{attribute}': formatDimensionCode(components.attribute?.code, 'attribute'),
-    '{color}': formatDimensionCode(components.color?.code, 'color'),
-    '{size}': formatDimensionCode(components.size?.code, 'size'),
-    '{gender}': formatDimensionCode(components.gender?.code, 'gender'),
-    '{age}': formatDimensionCode(components.age?.code, 'age'),
-    '{season}': formatDimensionCode(components.season?.code, 'season'),
-    '{character}': formatDimensionCode(components.character?.code, 'character'),
+    '{category}': components.category ? formatDimensionCode(components.category.code, 'category') : '',
+    '{subcategory}': components.subcategory ? formatDimensionCode(components.subcategory.code, 'subcategory') : '',
+    '{attribute}': components.attribute ? formatDimensionCode(components.attribute.code, 'attribute') : '',
+    '{color}': components.color ? formatDimensionCode(components.color.code, 'color') : '',
+    '{size}': components.size ? formatDimensionCode(components.size.code, 'size') : '',
+    '{gender}': components.gender ? formatDimensionCode(components.gender.code, 'gender') : '',
+    '{age}': components.age ? formatDimensionCode(components.age.code, 'age') : '',
+    '{season}': components.season ? formatDimensionCode(components.season.code, 'season') : '',
+    '{character}': components.character ? formatDimensionCode(components.character.code, 'character') : '',
   };
 
   let sku = template;
@@ -124,6 +124,14 @@ export function generateSku(
   // Replace each token
   for (const [token, value] of Object.entries(tokenValues)) {
     sku = sku.split(token).join(value);
+  }
+
+  // If character was provided but the template did not include {character}, append it to guarantee SKU uniqueness
+  if (components.character?.code && !template.includes('{character}')) {
+    const charCode = formatDimensionCode(components.character.code, 'character');
+    if (charCode && !sku.includes(charCode)) {
+      sku = `${sku}-${charCode}`;
+    }
   }
 
   // Clean multiple hyphens, underscores, or delimiters left by missing tokens

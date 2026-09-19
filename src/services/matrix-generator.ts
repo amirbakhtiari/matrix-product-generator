@@ -84,6 +84,7 @@ export async function generateMatrix(input: MatrixInput): Promise<MatrixResult> 
   }
 
   const generatedNames = new Set<string>();
+  const generatedSkus = new Set<string>();
   let index = 0;
 
   for (const cat of catList) {
@@ -116,7 +117,17 @@ export async function generateMatrix(input: MatrixInput): Promise<MatrixResult> 
                   const rawName = generateProductName(components);
                   const uniqueName = rawName;
 
-                  const sku = generateSku(components, skuTemplate);
+                  const rawSku = generateSku(components, skuTemplate);
+                  let uniqueSku = rawSku;
+                  if (generatedSkus.has(uniqueSku)) {
+                    let skuCounter = 2;
+                    while (generatedSkus.has(`${rawSku}-${skuCounter}`)) {
+                      skuCounter++;
+                    }
+                    uniqueSku = `${rawSku}-${skuCounter}`;
+                  }
+                  const sku = uniqueSku;
+                  generatedSkus.add(sku);
 
                   let barcode = '';
                   if (useStructuredBarcode) {

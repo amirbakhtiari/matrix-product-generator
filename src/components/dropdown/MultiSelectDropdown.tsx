@@ -7,6 +7,8 @@ export interface MultiSelectItem {
   code?: string;
   hexCode?: string;
   isActive?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export interface MultiSelectDropdownProps {
@@ -121,6 +123,9 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   }, [isOpen]);
 
   const handleToggleItem = (itemId: string) => {
+    const item = itemMap.get(itemId);
+    if (item?.disabled) return;
+
     if (selectedIds.includes(itemId)) {
       onChange(selectedIds.filter((id) => id !== itemId));
     } else {
@@ -129,7 +134,8 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   };
 
   const handleSelectAllFiltered = () => {
-    const filteredIdSet = new Set(filteredItems.map((i) => i.id));
+    const selectableItems = filteredItems.filter((i) => !i.disabled);
+    const filteredIdSet = new Set(selectableItems.map((i) => i.id));
     const newSelected = Array.from(new Set([...selectedIds, ...filteredIdSet]));
     onChange(newSelected);
   };
@@ -143,9 +149,14 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
     onChange(selectedIds.filter((id) => id !== itemId));
   };
 
+  const selectableFilteredItems = useMemo(
+    () => filteredItems.filter((i) => !i.disabled),
+    [filteredItems]
+  );
+
   const isAllFilteredSelected =
-    filteredItems.length > 0 &&
-    filteredItems.every((item) => selectedIds.includes(item.id));
+    selectableFilteredItems.length > 0 &&
+    selectableFilteredItems.every((item) => selectedIds.includes(item.id));
 
   // Color schemes
   const colorStyles = {
@@ -335,14 +346,15 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
               <button
                 type="button"
                 onClick={handleSelectAllFiltered}
-                className={`font-medium transition-colors flex items-center gap-1 cursor-pointer ${
-                  isAllFilteredSelected
-                    ? 'text-slate-400'
-                    : 'text-blue-600 hover:text-blue-800'
+                disabled={selectableFilteredItems.length === 0}
+                className={`font-medium transition-colors flex items-center gap-1 ${
+                  isAllFilteredSelected || selectableFilteredItems.length === 0
+                    ? 'text-slate-400 cursor-not-allowed'
+                    : 'text-blue-600 hover:text-blue-800 cursor-pointer'
                 }`}
               >
                 <CheckSquare className="w-3.5 h-3.5" />
-                <span>انتخاب همه {filteredItems.length} مورد</span>
+                <span>انتخاب همه مجاز ({selectableFilteredItems.length})</span>
               </button>
 
               {selectedIds.length > 0 && (
@@ -371,24 +383,30 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
             ) : (
               displayItems.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
+                const isDisabled = Boolean(item.disabled);
 
                 return (
                   <li
                     key={item.id}
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleToggleItem(item.id)}
-                    className={`px-3 py-2 text-xs rounded-xl flex items-center justify-between cursor-pointer transition-colors ${
-                      isSelected
-                        ? colorStyles.rowSelected
-                        : 'text-slate-700 hover:bg-slate-100/70'
+                    aria-disabled={isDisabled}
+                    onClick={() => !isDisabled && handleToggleItem(item.id)}
+                    className={`px-3 py-2 text-xs rounded-xl flex items-center justify-between transition-colors ${
+                      isDisabled
+                        ? 'bg-slate-50/80 text-slate-400 cursor-not-allowed select-none opacity-65'
+                        : isSelected
+                        ? `${colorStyles.rowSelected} cursor-pointer`
+                        : 'text-slate-700 hover:bg-slate-100/70 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
                       {/* Checkbox */}
                       <div
                         className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0 ${
-                          isSelected
+                          isDisabled
+                            ? 'border-slate-200 bg-slate-100 text-slate-300'
+                            : isSelected
                             ? `${colorStyles.boxSelected} shadow-2xs`
                             : 'border-slate-300 bg-white hover:border-slate-400'
                         }`}
@@ -399,23 +417,36 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                       {/* Color Hex Circle if present */}
                       {item.hexCode && (
                         <span
-                          className="w-4 h-4 rounded-full border border-black/15 shrink-0 shadow-2xs"
+                          className={`w-4 h-4 rounded-full border border-black/15 shrink-0 shadow-2xs ${
+                            isDisabled ? 'opacity-30' : ''
+                          }`}
                           style={{ backgroundColor: item.hexCode }}
                           title={item.hexCode}
                         />
                       )}
 
                       {/* Name */}
-                      <span className="truncate">{item.name}</span>
+                      <span
+                        className={`truncate ${
+                          isDisabled ? 'line-through text-slate-400 font-normal' : ''
+                        }`}
+                      >
+                        {item.name}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {isDisabled && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 font-medium">
+                          {item.disabledReason || 'قبلاً استفاده شده'}
+                        </span>
+                      )}
                       {item.code && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-mono border border-slate-200/80">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-mono border border-slate-200/80">
                           {item.code}
                         </span>
                       )}
-                      {isSelected && (
+                      {!isDisabled && isSelected && (
                         <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-md bg-white/90 border border-slate-200 text-slate-700 flex items-center gap-0.5">
                           <Check className="w-2.5 h-2.5 stroke-[3] text-emerald-600" />
                           تیک‌خورده

@@ -117,8 +117,66 @@ export const productRepository = {
   },
 
   async bulkSaveProducts(products: Product[]): Promise<void> {
+    if (!products || products.length === 0) return;
+
+    // 1. Deduplicate within the incoming batch itself by SKU and Barcode
+    const seenBatchSkus = new Set<string>();
+    const seenBatchBarcodes = new Set<string>();
+    const dedupedIncoming: Product[] = [];
+
+    for (const p of products) {
+      const cleanSku = p.sku ? p.sku.trim() : '';
+      const cleanBarcode = p.barcode ? p.barcode.trim() : '';
+
+      if (!cleanSku || !cleanBarcode) continue;
+      if (seenBatchSkus.has(cleanSku) || seenBatchBarcodes.has(cleanBarcode)) {
+        continue;
+      }
+      seenBatchSkus.add(cleanSku);
+      seenBatchBarcodes.add(cleanBarcode);
+      dedupedIncoming.push({
+        ...p,
+        sku: cleanSku,
+        barcode: cleanBarcode,
+      });
+    }
+
+    if (dedupedIncoming.length === 0) return;
+
+    // 2. Fetch existing products from DB to avoid collision on unique indexes (&sku, &barcode)
+    const existingProducts = await db.products.toArray();
+    const existingSkuMap = new Map<string, Product>();
+    const existingBarcodeMap = new Map<string, Product>();
+
+    for (const ep of existingProducts) {
+      if (ep.sku) existingSkuMap.set(ep.sku.trim(), ep);
+      if (ep.barcode) existingBarcodeMap.set(ep.barcode.trim(), ep);
+    }
+
+    // 3. For any incoming product matching an existing SKU/Barcode, use the existing ID so put() updates safely
+    const finalToSave: Product[] = dedupedIncoming.map((p) => {
+      const existingBySku = existingSkuMap.get(p.sku);
+      const existingByBarcode = existingBarcodeMap.get(p.barcode);
+
+      if (existingBySku) {
+        return {
+          ...p,
+          id: existingBySku.id,
+          updatedAt: Date.now(),
+        };
+      }
+      if (existingByBarcode) {
+        return {
+          ...p,
+          id: existingByBarcode.id,
+          updatedAt: Date.now(),
+        };
+      }
+      return p;
+    });
+
     await db.transaction('rw', db.products, async () => {
-      await db.products.bulkPut(products);
+      await db.products.bulkPut(finalToSave);
     });
   },
 
