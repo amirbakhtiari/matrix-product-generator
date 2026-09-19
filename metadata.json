@@ -1,0 +1,6 @@
+{
+  "name": "ماتریس ساز محصول",
+  "description": "سامانه مدیریت و تولید ماتریس کالا، بارکد، کد کالا (SKU) و خروجی اکسل پوشاک کودکان",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
