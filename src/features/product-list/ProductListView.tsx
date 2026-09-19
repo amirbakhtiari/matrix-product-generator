@@ -23,6 +23,10 @@ import {
   Plus,
   RefreshCcw,
   Sparkles,
+  Printer,
+  CheckCheck,
+  CheckCircle2,
+  SquareX,
 } from 'lucide-react';
 
 export const ProductListView: React.FC = () => {
@@ -30,6 +34,7 @@ export const ProductListView: React.FC = () => {
     products,
     totalProducts,
     allDatabaseCount,
+    needsPrintCount,
     selectedProductIds,
     filters,
     page,
@@ -50,6 +55,9 @@ export const ProductListView: React.FC = () => {
     deleteProduct,
     bulkDeleteSelected,
     saveProduct,
+    updateProductPrintStatus,
+    markSelectedAsPrinted,
+    markSelectedAsNeedsPrint,
   } = useProductStore();
 
   const { categories, subcategories, colors, sizes, genders, ages, settings } = useCatalogStore();
@@ -175,7 +183,35 @@ export const ProductListView: React.FC = () => {
           </div>
 
           {/* Filter Toggles & Quick Actions */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+            {/* Quick Filter: Needs Print */}
+            <button
+              type="button"
+              onClick={() => {
+                setFilter({
+                  printStatus: filters.printStatus === 'needs_print' ? 'all' : 'needs_print',
+                });
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer select-none ${
+                filters.printStatus === 'needs_print'
+                  ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                  : 'bg-amber-50/90 text-amber-900 border-amber-200 hover:bg-amber-100'
+              }`}
+              title="فیلتر محصولات نیازمند چاپ لیبل"
+            >
+              <Printer className="w-3.5 h-3.5 shrink-0" />
+              <span>فیلتر چاپ: نیازمند چاپ</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                  filters.printStatus === 'needs_print'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-amber-200 text-amber-950'
+                }`}
+              >
+                {needsPrintCount.toLocaleString('fa-IR')}
+              </span>
+            </button>
+
             <Button
               variant={showFiltersPanel ? 'primary' : 'outline'}
               size="sm"
@@ -191,6 +227,7 @@ export const ProductListView: React.FC = () => {
               filters.colorId ||
               filters.sizeId ||
               filters.genderId ||
+              (filters.printStatus && filters.printStatus !== 'all') ||
               filters.search) && (
               <Button
                 variant="ghost"
@@ -214,7 +251,7 @@ export const ProductListView: React.FC = () => {
 
         {/* Collapsible Advanced Filters */}
         {showFiltersPanel && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-3 border-t border-slate-100 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-3 border-t border-slate-100 text-xs">
             {/* Category */}
             <div>
               <CustomDropdown
@@ -317,61 +354,142 @@ export const ProductListView: React.FC = () => {
                 ]}
               />
             </div>
+
+            {/* Print Status Filter */}
+            <div>
+              <CustomDropdown
+                label="وضعیت چاپ لیبل"
+                size="sm"
+                placeholder="همه وضعیت‌ها"
+                value={filters.printStatus || 'all'}
+                onChange={(val) => setFilter({ printStatus: (val as any) || 'all' })}
+                options={[
+                  { value: 'all', label: 'همه محصولات' },
+                  { value: 'needs_print', label: 'نیازمند چاپ لیبل' },
+                  { value: 'printed', label: 'چاپ‌شده / عادی' },
+                ]}
+              />
+            </div>
           </div>
         )}
       </div>
 
-      {/* Bulk Selection Bar */}
-      {selectedProductIds.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-blue-900">
+      {/* Persistent Bulk Selection Action Bar */}
+      <div
+        className={`rounded-xl border p-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs transition-all ${
+          selectedProductIds.size > 0
+            ? 'bg-blue-50/90 border-blue-200 text-blue-950 shadow-xs'
+            : 'bg-slate-50/80 border-slate-200 text-slate-500'
+        }`}
+      >
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-blue-600" />
-            <span className="font-bold">
-              {selectedProductIds.size.toLocaleString('fa-IR')} محصول انتخاب شده است
+            {selectedProductIds.size > 0 ? (
+              <CheckSquare className="w-4 h-4 text-blue-600 shrink-0" />
+            ) : (
+              <Square className="w-4 h-4 text-slate-400 shrink-0" />
+            )}
+            <span className={selectedProductIds.size > 0 ? 'font-bold text-blue-900' : 'text-slate-600'}>
+              {selectedProductIds.size > 0
+                ? `${selectedProductIds.size.toLocaleString('fa-IR')} محصول از ${totalProducts.toLocaleString('fa-IR')} انتخاب شده`
+                : 'نوار عملیات گروهی (محصولات مورد نظر را از جدول انتخاب کنید)'}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          {/* Icon Buttons for Select All / Deselect All */}
+          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+            <button
+              type="button"
               onClick={selectAllMatching}
-              className="text-xs bg-white"
+              title={`انتخاب همه ${totalProducts.toLocaleString('fa-IR')} محصول یافت‌شده`}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-700 hover:text-blue-700 hover:bg-blue-50 transition-colors cursor-pointer"
             >
-              انتخاب همه {totalProducts.toLocaleString('fa-IR')} مورد یافت‌شده
-            </Button>
+              <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">انتخاب همه ({totalProducts.toLocaleString('fa-IR')})</span>
+            </button>
 
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
+              disabled={selectedProductIds.size === 0}
               onClick={deselectAll}
-              className="text-xs bg-white"
+              title="لغو انتخاب همه"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                selectedProductIds.size === 0
+                  ? 'text-slate-300 cursor-not-allowed'
+                  : 'text-slate-700 hover:text-rose-600 hover:bg-rose-50 cursor-pointer'
+              }`}
             >
-              لغو انتخاب همه
-            </Button>
-
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<FileSpreadsheet className="w-3.5 h-3.5" />}
-              onClick={() => setExcelModalOpen(true)}
-              className="text-xs"
-            >
-              خروجی اکسل انتخاب‌شده‌ها
-            </Button>
-
-            <Button
-              variant="danger"
-              size="sm"
-              icon={<Trash2 className="w-3.5 h-3.5" />}
-              onClick={handleBulkDelete}
-              className="text-xs"
-            >
-              حذف انتخاب‌شده‌ها
-            </Button>
+              <SquareX className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">لغو انتخاب</span>
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Action Buttons (Active / Inactive based on selection) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Mark as Needs Print */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={selectedProductIds.size === 0}
+            onClick={async () => {
+              if (selectedProductIds.size === 0) return;
+              await markSelectedAsNeedsPrint();
+              showToast({
+                type: 'success',
+                message: `${selectedProductIds.size.toLocaleString('fa-IR')} محصول به عنوان «نیازمند چاپ لیبل» ثبت گردید`,
+              });
+            }}
+            icon={<Printer className="w-3.5 h-3.5 text-amber-600" />}
+            className="text-xs bg-white text-amber-900 border-amber-200 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            نیازمند چاپ
+          </Button>
+
+          {/* Mark as Printed */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={selectedProductIds.size === 0}
+            onClick={async () => {
+              if (selectedProductIds.size === 0) return;
+              await markSelectedAsPrinted();
+              showToast({
+                type: 'success',
+                message: `${selectedProductIds.size.toLocaleString('fa-IR')} محصول به عنوان «چاپ‌شده» ثبت گردید`,
+              });
+            }}
+            icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+            className="text-xs bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ثبت چاپ‌شده
+          </Button>
+
+          {/* Excel Export */}
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={selectedProductIds.size === 0}
+            icon={<FileSpreadsheet className="w-3.5 h-3.5" />}
+            onClick={() => setExcelModalOpen(true)}
+            className="text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            خروجی اکسل و چاپ لیبل
+          </Button>
+
+          {/* Delete */}
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={selectedProductIds.size === 0}
+            icon={<Trash2 className="w-3.5 h-3.5" />}
+            onClick={handleBulkDelete}
+            className="text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            حذف
+          </Button>
+        </div>
+      </div>
 
       {/* Products Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -460,6 +578,7 @@ export const ProductListView: React.FC = () => {
                   <th className="p-3 min-w-[70px] font-bold">سایز</th>
                   <th className="p-3 min-w-[80px] font-bold">جنسیت</th>
                   <th className="p-3 min-w-[90px] font-bold">رده سنی</th>
+                  <th className="p-3 min-w-[100px] text-center font-bold">وضعیت چاپ</th>
                   <th className="p-3 min-w-[130px] text-center font-bold">عملیات</th>
                 </tr>
               </thead>
@@ -588,6 +707,37 @@ export const ProductListView: React.FC = () => {
                       {/* Age */}
                       <td className="p-3 text-slate-600">
                         {ageObj?.name || '-'}
+                      </td>
+
+                      {/* Print Status */}
+                      <td className="p-3 text-center">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextStatus = !product.needsPrint;
+                            await updateProductPrintStatus(product.id, nextStatus);
+                            showToast({
+                              type: 'info',
+                              message: nextStatus
+                                ? 'محصول به عنوان «نیازمند چاپ لیبل» علامت‌گذاری شد'
+                                : 'محصول به عنوان «چاپ‌شده» ثبت شد',
+                            });
+                          }}
+                          title={product.needsPrint ? 'کلیک برای تغییر به چاپ‌شده' : 'کلیک برای تغییر به نیازمند چاپ'}
+                          className="cursor-pointer transition-transform active:scale-95 inline-flex items-center justify-center"
+                        >
+                          {product.needsPrint ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full hover:bg-amber-200 shadow-2xs">
+                              <Printer className="w-2.5 h-2.5 text-amber-700" />
+                              <span>نیازمند چاپ</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full hover:bg-slate-200">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>چاپ شده</span>
+                            </span>
+                          )}
+                        </button>
                       </td>
 
                       {/* Operations */}

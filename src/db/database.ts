@@ -54,6 +54,20 @@ export class ProductMatrixDatabase extends Dexie {
       products: 'id, &sku, &barcode, name, categoryId, subcategoryId, attributeId, colorId, sizeId, genderId, ageId, seasonId, characterId, price, isActive, createdAt',
       settings: 'id',
     });
+
+    this.version(3).stores({
+      categories: 'id, name, code, isActive, sortOrder',
+      subcategories: 'id, parentId, name, code, isActive, sortOrder',
+      attributes: 'id, name, code, isActive, sortOrder',
+      colors: 'id, name, code, isActive, sortOrder',
+      sizes: 'id, name, code, isActive, sortOrder',
+      genders: 'id, name, code, isActive, sortOrder',
+      ages: 'id, name, code, isActive, sortOrder',
+      seasons: 'id, name, code, isActive, sortOrder',
+      characters: 'id, name, code, isActive, sortOrder',
+      products: 'id, &sku, &barcode, name, categoryId, subcategoryId, attributeId, colorId, sizeId, genderId, ageId, seasonId, characterId, price, isActive, needsPrint, createdAt',
+      settings: 'id',
+    });
   }
 }
 

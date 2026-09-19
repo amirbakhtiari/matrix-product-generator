@@ -219,35 +219,31 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   }[badgeColor];
 
   return (
-    <div id={id} ref={containerRef} className={`w-full flex flex-col gap-1.5 relative ${className}`}>
-      {/* Label and Actions */}
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+    <div id={id} ref={containerRef} className={`w-full flex flex-col gap-1 relative ${className}`}>
+      {/* Label (Clean, uniform height, no shifting clear button) */}
+      <div className="flex items-center justify-between h-5">
+        <label className="text-xs font-semibold text-slate-800 flex items-center gap-1 truncate">
           <span>{label}</span>
           {required && <span className="text-rose-500">*</span>}
           <span className="text-[11px] font-normal text-slate-500">
             ({uniqueItems.length} مورد)
           </span>
         </label>
-        {selectedIds.length > 0 && !disabled && (
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-          >
-            پاک کردن همه ({selectedIds.length})
-          </button>
+        {selectedIds.length > 0 && (
+          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100">
+            {selectedIds.length} انتخاب
+          </span>
         )}
       </div>
 
-      {/* Trigger Button */}
+      {/* Trigger Button (Fixed height h-10, strictly single-line, continuous inline display) */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full min-h-[42px] px-3 py-1.5 rounded-xl border bg-white text-sm flex items-center justify-between gap-2 text-right transition-all cursor-pointer focus:outline-none ${
+        className={`w-full h-10 min-h-[40px] max-h-[40px] px-3 py-1.5 rounded-xl border bg-white text-sm flex items-center justify-between gap-2 text-right transition-all cursor-pointer focus:outline-none ${
           disabled
             ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
             : error
@@ -257,48 +253,22 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
             : 'border-slate-300 hover:border-slate-400 shadow-xs'
         }`}
       >
-        <div className="flex items-center gap-1.5 overflow-hidden flex-wrap grow py-0.5">
+        <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap grow min-w-0">
           {selectedItems.length === 0 ? (
             <span className="text-slate-400 text-xs truncate">
               {disabled && disabledMessage ? disabledMessage : placeholder}
             </span>
           ) : (
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-hidden min-w-0 grow">
               <span
-                className={`text-xs px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${colorStyles.badge}`}
+                className={`text-[11px] px-2 py-0.5 rounded-md font-bold border flex items-center gap-1 shrink-0 ${colorStyles.badge}`}
               >
                 <Check className="w-3 h-3 stroke-[3]" />
-                <span>{selectedItems.length} مورد تیک‌خورده</span>
+                <span>{selectedItems.length}</span>
               </span>
-              {/* Show first 2 selected names as pill previews */}
-              {selectedItems.slice(0, 2).map((item) => (
-                <span
-                  key={item.id}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 max-w-[140px] truncate"
-                >
-                  <Check className="w-2.5 h-2.5 stroke-[3] text-emerald-600 shrink-0" />
-                  {item.hexCode && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0"
-                      style={{ backgroundColor: item.hexCode }}
-                    />
-                  )}
-                  <span className="truncate">{item.name}</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => handleRemoveSingle(item.id, e)}
-                    className="text-slate-400 hover:text-rose-600 ml-0.5 cursor-pointer"
-                  >
-                    ×
-                  </span>
-                </span>
-              ))}
-              {selectedItems.length > 2 && (
-                <span className="text-[11px] text-slate-500 font-medium">
-                  +{selectedItems.length - 2} دیگر
-                </span>
-              )}
+              <span className="text-xs text-slate-800 truncate font-medium">
+                {selectedItems.map((item) => item.name).join('، ')}
+              </span>
             </div>
           )}
         </div>

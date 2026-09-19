@@ -57,6 +57,11 @@ export const productRepository = {
       if (filter.maxPrice !== undefined && filter.maxPrice > 0) {
         items = items.filter((p) => p.price <= filter.maxPrice!);
       }
+      if (filter.printStatus === 'needs_print') {
+        items = items.filter((p) => Boolean(p.needsPrint));
+      } else if (filter.printStatus === 'printed') {
+        items = items.filter((p) => !p.needsPrint);
+      }
     }
 
     // Sort
@@ -192,5 +197,34 @@ export const productRepository = {
 
   async count(): Promise<number> {
     return db.products.count();
+  },
+
+  async countNeedsPrint(): Promise<number> {
+    return db.products.filter((p) => Boolean(p.needsPrint)).count();
+  },
+
+  async updatePrintStatus(id: string, needsPrint: boolean): Promise<void> {
+    const product = await db.products.get(id);
+    if (product) {
+      await db.products.put({
+        ...product,
+        needsPrint,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+
+  async bulkUpdatePrintStatus(ids: string[], needsPrint: boolean): Promise<void> {
+    if (!ids || ids.length === 0) return;
+    const now = Date.now();
+    await db.transaction('rw', db.products, async () => {
+      const items = await db.products.where('id').anyOf(ids).toArray();
+      const updated = items.map((p) => ({
+        ...p,
+        needsPrint,
+        updatedAt: now,
+      }));
+      await db.products.bulkPut(updated);
+    });
   },
 };

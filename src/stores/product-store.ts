@@ -6,6 +6,7 @@ interface ProductStoreState {
   products: Product[];
   totalProducts: number;
   allDatabaseCount: number;
+  needsPrintCount: number;
   selectedProductIds: Set<string>;
   filters: ProductFilter;
   page: number;
@@ -29,6 +30,10 @@ interface ProductStoreState {
   bulkSaveProducts: (products: Product[]) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   bulkDeleteSelected: () => Promise<void>;
+  updateProductPrintStatus: (id: string, needsPrint: boolean) => Promise<void>;
+  bulkUpdatePrintStatus: (ids: string[], needsPrint: boolean) => Promise<void>;
+  markSelectedAsPrinted: () => Promise<void>;
+  markSelectedAsNeedsPrint: () => Promise<void>;
 }
 
 const defaultFilters: ProductFilter = {
@@ -42,12 +47,14 @@ const defaultFilters: ProductFilter = {
   ageId: undefined,
   minPrice: undefined,
   maxPrice: undefined,
+  printStatus: 'all',
 };
 
 export const useProductStore = create<ProductStoreState>((set, get) => ({
   products: [],
   totalProducts: 0,
   allDatabaseCount: 0,
+  needsPrintCount: 0,
   selectedProductIds: new Set<string>(),
   filters: { ...defaultFilters },
   page: 1,
@@ -60,15 +67,17 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
     set({ isLoading: true });
     try {
       const { page, pageSize, filters, sortField, sortDirection } = get();
-      const [result, totalCount] = await Promise.all([
+      const [result, totalCount, needsPrintCount] = await Promise.all([
         productRepository.getProducts(page, pageSize, filters, sortField, sortDirection),
         productRepository.count(),
+        productRepository.countNeedsPrint(),
       ]);
 
       set({
         products: result.products,
         totalProducts: result.total,
         allDatabaseCount: totalCount,
+        needsPrintCount,
         isLoading: false,
       });
     } catch (err) {
@@ -78,8 +87,11 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
   },
 
   refreshCount: async () => {
-    const allDatabaseCount = await productRepository.count();
-    set({ allDatabaseCount });
+    const [allDatabaseCount, needsPrintCount] = await Promise.all([
+      productRepository.count(),
+      productRepository.countNeedsPrint(),
+    ]);
+    set({ allDatabaseCount, needsPrintCount });
   },
 
   setFilter: (newFilters: Partial<ProductFilter>) => {
@@ -176,6 +188,30 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
     if (selectedProductIds.size === 0) return;
     await productRepository.bulkDeleteProducts(Array.from(selectedProductIds));
     set({ selectedProductIds: new Set<string>() });
+    await get().loadProducts();
+  },
+
+  updateProductPrintStatus: async (id: string, needsPrint: boolean) => {
+    await productRepository.updatePrintStatus(id, needsPrint);
+    await get().loadProducts();
+  },
+
+  bulkUpdatePrintStatus: async (ids: string[], needsPrint: boolean) => {
+    await productRepository.bulkUpdatePrintStatus(ids, needsPrint);
+    await get().loadProducts();
+  },
+
+  markSelectedAsPrinted: async () => {
+    const { selectedProductIds } = get();
+    if (selectedProductIds.size === 0) return;
+    await productRepository.bulkUpdatePrintStatus(Array.from(selectedProductIds), false);
+    await get().loadProducts();
+  },
+
+  markSelectedAsNeedsPrint: async () => {
+    const { selectedProductIds } = get();
+    if (selectedProductIds.size === 0) return;
+    await productRepository.bulkUpdatePrintStatus(Array.from(selectedProductIds), true);
     await get().loadProducts();
   },
 }));

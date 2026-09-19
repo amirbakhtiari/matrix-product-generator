@@ -30,6 +30,7 @@ import {
   Barcode,
   Search,
   ExternalLink,
+  Printer,
 } from 'lucide-react';
 
 export const ProductMatrixView: React.FC = () => {
@@ -61,6 +62,7 @@ export const ProductMatrixView: React.FC = () => {
   // Base price & custom model name
   const [basePrice, setBasePrice] = useState<string>('450,000');
   const [customModelName, setCustomModelName] = useState<string>('');
+  const [markForPrintAfterSave, setMarkForPrintAfterSave] = useState<boolean>(true);
 
   // Existing products tracking to prevent duplicate usage of product names (کاراکتر/مدل)
   const [usedCharacterIds, setUsedCharacterIds] = useState<Set<string>>(new Set());
@@ -581,6 +583,7 @@ export const ProductMatrixView: React.FC = () => {
         barcode: r.barcode.trim(),
         price: Number(r.price) || 0,
         isActive: true,
+        needsPrint: markForPrintAfterSave,
         createdAt: now,
         updatedAt: now,
       }));
@@ -591,7 +594,9 @@ export const ProductMatrixView: React.FC = () => {
 
       showToast({
         type: 'success',
-        message: `${productsToSave.length.toLocaleString('fa-IR')} محصول با موفقیت در دیتابیس لوکال ذخیره شدند`,
+        message: markForPrintAfterSave
+          ? `${productsToSave.length.toLocaleString('fa-IR')} محصول با برچسب «نیازمند چاپ لیبل» در دیتابیس ذخیره شدند`
+          : `${productsToSave.length.toLocaleString('fa-IR')} محصول با موفقیت در دیتابیس ذخیره شدند`,
       });
 
       // Clear matrix or transition
@@ -934,7 +939,19 @@ export const ProductMatrixView: React.FC = () => {
 
             {/* Actions: Excel Export, Bulk Save, Clean Duplicates */}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative w-48">
+              {/* Mark for Print Toggle Checkbox */}
+              <label className="flex items-center gap-2 text-xs bg-amber-50/90 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl cursor-pointer hover:bg-amber-100/70 transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={markForPrintAfterSave}
+                  onChange={(e) => setMarkForPrintAfterSave(e.target.checked)}
+                  className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <Printer className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span className="font-semibold text-[11px]">این محصولات چاپ شود (ارسال به صف چاپ بعد از ذخیره)</span>
+              </label>
+
+              <div className="relative w-44">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
                 <Input
                   type="text"
@@ -1016,7 +1033,8 @@ export const ProductMatrixView: React.FC = () => {
                   <th className="p-3 w-36">کد کالا (SKU)</th>
                   <th className="p-3 w-48">بارکد ساختاریافته (۱۹ رقم)</th>
                   <th className="p-3 w-32">قیمت (تومان)</th>
-                  <th className="p-3 w-28 text-center">وضعیت</th>
+                  <th className="p-3 w-28 text-center">وضعیت چاپ</th>
+                  <th className="p-3 w-24 text-center">وضعیت</th>
                   <th className="p-3 w-16 text-center">عملیات</th>
                 </tr>
               </thead>
@@ -1122,6 +1140,18 @@ export const ProductMatrixView: React.FC = () => {
                           }}
                           className="w-full text-left direction-ltr font-mono bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 focus:bg-white rounded px-2 py-1 text-slate-900 transition-colors font-medium"
                         />
+                      </td>
+
+                      {/* Print Status */}
+                      <td className="p-3 text-center">
+                        {markForPrintAfterSave ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200">
+                            <Printer className="w-2.5 h-2.5 text-amber-700" />
+                            <span>چاپ شود</span>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">عادی</span>
+                        )}
                       </td>
 
                       {/* Status */}

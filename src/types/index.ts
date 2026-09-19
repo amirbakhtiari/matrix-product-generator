@@ -51,6 +51,7 @@ export interface Product {
   price: number;
 
   isActive: boolean;
+  needsPrint?: boolean; // آیا نیازمند چاپ لیبل و بارکد است
 
   createdAt: number;
   updatedAt: number;
@@ -97,6 +98,7 @@ export interface MatrixCombination {
   isDuplicateSku: boolean;
   isDuplicateBarcode: boolean;
   isDuplicateName?: boolean;
+  needsPrint?: boolean;
   existingProduct?: Product;
 }
 
@@ -121,4 +123,5 @@ export interface ProductFilter {
   characterId?: string;
   minPrice?: number;
   maxPrice?: number;
+  printStatus?: 'all' | 'needs_print' | 'printed';
 }
