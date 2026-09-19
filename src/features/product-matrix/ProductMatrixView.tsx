@@ -57,8 +57,9 @@ export const ProductMatrixView: React.FC = () => {
   const [selectedSizeIds, setSelectedSizeIds] = useState<string[]>([]);
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
 
-  // Base price
+  // Base price & custom model name
   const [basePrice, setBasePrice] = useState<string>('450,000');
+  const [customModelName, setCustomModelName] = useState<string>('');
 
   // Generated matrix results
   const [combinations, setCombinations] = useState<MatrixCombination[]>([]);
@@ -347,6 +348,7 @@ export const ProductMatrixView: React.FC = () => {
         genders: chosenGenders,
         sizes: chosenSizes,
         characters: chosenCharacters,
+        modelName: customModelName.trim() || undefined,
         basePrice: numericPrice,
         skuTemplate: settings.skuTemplate,
         barcodeType: settings.barcodeType,
@@ -380,6 +382,7 @@ export const ProductMatrixView: React.FC = () => {
     setSelectedGenderIds([]);
     setSelectedSizeIds([]);
     setSelectedCharacterIds([]);
+    setCustomModelName('');
     showToast({ type: 'info', message: 'تمامی انتخاب‌های دراپ‌داون ریست شدند' });
   };
 
@@ -678,8 +681,8 @@ export const ProductMatrixView: React.FC = () => {
           />
         </div>
 
-        {/* Barcode Structure Explainer & Base Price Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-4 border-t border-slate-100 items-center">
+        {/* Barcode Structure Explainer, Model Name & Base Price Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-100 items-start">
           {/* Base Price */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-700">
@@ -699,8 +702,24 @@ export const ProductMatrixView: React.FC = () => {
             />
           </div>
 
+          {/* Model Name for Parentheses */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+              <span>نام کالا / مدل (داخل پرانتز)</span>
+              <span className="text-[10px] text-blue-600 font-normal">اختیاری</span>
+            </label>
+            <Input
+              type="text"
+              value={customModelName}
+              onChange={(e) => setCustomModelName(e.target.value)}
+              placeholder="مثال: تدی، خرسی، بهاره..."
+              className="text-xs"
+              helperText="الگو: [گروه اصلی] [ویژگی] ([نام کالا])"
+            />
+          </div>
+
           {/* Visual Barcode Format Explanation */}
-          <div className="lg:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
+          <div className="md:col-span-2 lg:col-span-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-800 flex items-center gap-1.5">
                 <Barcode className="w-4 h-4 text-blue-600" />

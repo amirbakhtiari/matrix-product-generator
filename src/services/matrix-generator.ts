@@ -25,6 +25,7 @@ export interface MatrixInput {
   characters: CharacterItem[];
   subcategories?: SubCategory[];
   ages?: Age[];
+  modelName?: string;
   basePrice: number;
   skuTemplate: string;
   barcodeType: 'EAN-13' | 'CODE-128';
@@ -109,19 +110,11 @@ export async function generateMatrix(input: MatrixInput): Promise<MatrixResult> 
                     gender,
                     size,
                     character: char,
+                    modelName: input.modelName,
                   };
 
                   const rawName = generateProductName(components);
-                  // Guarantee strictly unique title for every matrix combination
-                  let uniqueName = rawName;
-                  if (generatedNames.has(uniqueName.toLowerCase())) {
-                    let counter = 2;
-                    while (generatedNames.has(`${rawName} (${counter})`.toLowerCase())) {
-                      counter++;
-                    }
-                    uniqueName = `${rawName} (${counter})`;
-                  }
-                  generatedNames.add(uniqueName.toLowerCase());
+                  const uniqueName = rawName;
 
                   const sku = generateSku(components, skuTemplate);
 

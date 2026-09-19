@@ -13,6 +13,10 @@ import type {
 } from '../types/index.ts';
 import { SEEDED_COLORS_200 } from '../data/colors-data.ts';
 import { SEEDED_CHARACTERS_1000 } from '../data/characters-data.ts';
+import {
+  generateUserCategories,
+  generateUserAttributes,
+} from '../data/categories-attributes-data.ts';
 
 let seedPromise: Promise<boolean> | null = null;
 
@@ -25,6 +29,26 @@ export async function seedInitialDataIfNeeded(): Promise<boolean> {
     try {
       const now = Date.now();
 
+      // Ensure user-provided categories (95 items) and attributes (150+ items) replace any old seed
+      const categoryCount = await db.categories.count();
+      const firstCat = await db.categories.orderBy('sortOrder').first();
+      const isNewCategorySet = categoryCount >= 90 && firstCat?.name === 'تیشرت';
+
+      const attributeCount = await db.attributes.count();
+      const isNewAttributeSet = attributeCount >= 140;
+
+      let catalogUpdated = false;
+      if (!isNewCategorySet || !isNewAttributeSet) {
+        const newCategories = generateUserCategories(now);
+        await db.categories.clear();
+        await db.categories.bulkPut(newCategories);
+
+        const newAttributes = generateUserAttributes(now);
+        await db.attributes.clear();
+        await db.attributes.bulkPut(newAttributes);
+        catalogUpdated = true;
+      }
+
       // Always guarantee that all existing codes in IndexedDB are strictly numeric
       await ensureAllCatalogCodesAreNumeric();
 
@@ -35,7 +59,7 @@ export async function seedInitialDataIfNeeded(): Promise<boolean> {
 
       // If all new datasets already exist, we don't need to re-seed
       if (seasonCount > 0 && colorCount >= 200 && charCount >= 1000) {
-        return false;
+        return catalogUpdated;
       }
 
       const defaultSettings: Settings = {
@@ -47,51 +71,11 @@ export async function seedInitialDataIfNeeded(): Promise<boolean> {
         updatedAt: now,
       };
 
-      // 1. گروه اصلی (Category): 4 digits starting from 1000
-      // نوزادی، بچه‌گانه، دخترانه و پسرانه
-      const categories: Category[] = [
-        { id: 'cat-1001', name: 'سرهمی و بادی نوزادی', code: '1001', isActive: true, sortOrder: 1, createdAt: now, updatedAt: now },
-        { id: 'cat-1002', name: 'بلوز و تیشرت بچه‌گانه', code: '1002', isActive: true, sortOrder: 2, createdAt: now, updatedAt: now },
-        { id: 'cat-1003', name: 'پیراهن و سارافون دخترانه', code: '1003', isActive: true, sortOrder: 3, createdAt: now, updatedAt: now },
-        { id: 'cat-1004', name: 'تیشرت و پولوشرت پسرانه', code: '1004', isActive: true, sortOrder: 4, createdAt: now, updatedAt: now },
-        { id: 'cat-1005', name: 'شلوار و شلوارک بچه‌گانه', code: '1005', isActive: true, sortOrder: 5, createdAt: now, updatedAt: now },
-        { id: 'cat-1006', name: 'شلوار جین و کتان پسرانه', code: '1006', isActive: true, sortOrder: 6, createdAt: now, updatedAt: now },
-        { id: 'cat-1007', name: 'هودی، دورس و سویشرت کودک', code: '1007', isActive: true, sortOrder: 7, createdAt: now, updatedAt: now },
-        { id: 'cat-1008', name: 'کاپشن و پالتو زمستانه کودک', code: '1008', isActive: true, sortOrder: 8, createdAt: now, updatedAt: now },
-        { id: 'cat-1009', name: 'ست دوتکه و راحتی نوزادی', code: '1009', isActive: true, sortOrder: 9, createdAt: now, updatedAt: now },
-        { id: 'cat-1010', name: 'لباس خواب و راحتی بچه‌گانه', code: '1010', isActive: true, sortOrder: 10, createdAt: now, updatedAt: now },
-        { id: 'cat-1011', name: 'دامن و شومیز دخترانه', code: '1011', isActive: true, sortOrder: 11, createdAt: now, updatedAt: now },
-        { id: 'cat-1012', name: 'جلیقه و کت پسرانه', code: '1012', isActive: true, sortOrder: 12, createdAt: now, updatedAt: now },
-        { id: 'cat-1013', name: 'لباس ورزشی و گرمکن کودک', code: '1013', isActive: true, sortOrder: 13, createdAt: now, updatedAt: now },
-        { id: 'cat-1014', name: 'لباس زیر و شورت کودک و نوزاد', code: '1014', isActive: true, sortOrder: 14, createdAt: now, updatedAt: now },
-        { id: 'cat-1015', name: 'اکسسوری، کلاه و جوراب کودک', code: '1015', isActive: true, sortOrder: 15, createdAt: now, updatedAt: now },
-      ];
+      // 1. گروه اصلی (Category): 95 user-defined categories
+      const categories: Category[] = generateUserCategories(now);
 
-      // 2. ویژگی (Attribute): 3 digits starting from 101 or STD
-      // ساده، طرح‌دار، چاپدار، STD و سایر ویژگی‌ها
-      const attributes: Attribute[] = [
-        { id: 'attr-std', name: 'STD', code: 'STD', isActive: true, sortOrder: 0, createdAt: now, updatedAt: now },
-        { id: 'attr-101', name: 'ساده', code: '101', isActive: true, sortOrder: 1, createdAt: now, updatedAt: now },
-        { id: 'attr-102', name: 'طرح‌دار', code: '102', isActive: true, sortOrder: 2, createdAt: now, updatedAt: now },
-        { id: 'attr-103', name: 'چاپدار', code: '103', isActive: true, sortOrder: 3, createdAt: now, updatedAt: now },
-        { id: 'attr-104', name: 'عروسکی و فانتزی', code: '104', isActive: true, sortOrder: 4, createdAt: now, updatedAt: now },
-        { id: 'attr-105', name: 'گلدوزی‌شده', code: '105', isActive: true, sortOrder: 5, createdAt: now, updatedAt: now },
-        { id: 'attr-106', name: 'راه‌راه', code: '106', isActive: true, sortOrder: 6, createdAt: now, updatedAt: now },
-        { id: 'attr-107', name: 'چهارخانه', code: '107', isActive: true, sortOrder: 7, createdAt: now, updatedAt: now },
-        { id: 'attr-108', name: 'خال‌خالی', code: '108', isActive: true, sortOrder: 8, createdAt: now, updatedAt: now },
-        { id: 'attr-109', name: 'گلدار', code: '109', isActive: true, sortOrder: 9, createdAt: now, updatedAt: now },
-        { id: 'attr-110', name: 'پولک‌دوزی', code: '110', isActive: true, sortOrder: 10, createdAt: now, updatedAt: now },
-        { id: 'attr-111', name: 'تکه‌دوزی', code: '111', isActive: true, sortOrder: 11, createdAt: now, updatedAt: now },
-        { id: 'attr-112', name: 'اکلیلی و شاین', code: '112', isActive: true, sortOrder: 12, createdAt: now, updatedAt: now },
-        { id: 'attr-113', name: 'ابروبادی', code: '113', isActive: true, sortOrder: 13, createdAt: now, updatedAt: now },
-        { id: 'attr-114', name: 'بافت و ژاکارد', code: '114', isActive: true, sortOrder: 14, createdAt: now, updatedAt: now },
-        { id: 'attr-115', name: 'مخمل', code: '115', isActive: true, sortOrder: 15, createdAt: now, updatedAt: now },
-        { id: 'attr-116', name: 'جین شسته‌شده', code: '116', isActive: true, sortOrder: 16, createdAt: now, updatedAt: now },
-        { id: 'attr-117', name: 'کبریتی', code: '117', isActive: true, sortOrder: 17, createdAt: now, updatedAt: now },
-        { id: 'attr-118', name: 'کشباف', code: '118', isActive: true, sortOrder: 18, createdAt: now, updatedAt: now },
-        { id: 'attr-119', name: 'نئونی و فسفری', code: '119', isActive: true, sortOrder: 19, createdAt: now, updatedAt: now },
-        { id: 'attr-120', name: 'برجسته', code: '120', isActive: true, sortOrder: 20, createdAt: now, updatedAt: now },
-      ];
+      // 2. ویژگی (Attribute): 150 user-defined attributes + STD
+      const attributes: Attribute[] = generateUserAttributes(now);
 
       // 3. فصل (Season): 1 digit
       // SS, FW, همه فصول

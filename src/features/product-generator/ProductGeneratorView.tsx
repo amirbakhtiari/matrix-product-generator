@@ -50,6 +50,7 @@ export const ProductGeneratorView: React.FC = () => {
 
   // Text inputs
   const [productName, setProductName] = useState('');
+  const [customModelName, setCustomModelName] = useState('');
   const [isNameManuallyEdited, setIsNameManuallyEdited] = useState(false);
   const [sku, setSku] = useState('');
   const [isSkuManuallyEdited, setIsSkuManuallyEdited] = useState(false);
@@ -91,17 +92,14 @@ export const ProductGeneratorView: React.FC = () => {
   const currentGender = genders.find((g) => g.id === selectedGenderId);
   const currentAge = ages.find((a) => a.id === selectedAgeId);
 
-  // Auto-generate Name when selections change (unless user manually edited it)
+  // Auto-generate Name according to rule: گروه اصلی + ویژگی + داخل پرانتز نام محصول
   useEffect(() => {
     if (!isNameManuallyEdited) {
       const generated = generateProductName({
         category: currentCategory,
         subcategory: currentSubcategory,
         attribute: currentAttribute,
-        color: currentColor,
-        size: currentSize,
-        gender: currentGender,
-        age: currentAge,
+        productName: customModelName,
       });
       setProductName(generated);
     }
@@ -110,10 +108,7 @@ export const ProductGeneratorView: React.FC = () => {
     currentCategory,
     currentSubcategory,
     currentAttribute,
-    currentColor,
-    currentSize,
-    currentGender,
-    currentAge,
+    customModelName,
   ]);
 
   // Auto-generate SKU when selections change (unless user manually edited it)
@@ -235,6 +230,12 @@ export const ProductGeneratorView: React.FC = () => {
           setSelectedAgeId(p.ageId);
           setProductName(p.name);
           setIsNameManuallyEdited(true);
+          const match = p.name.match(/\(([^)]+)\)/);
+          if (match && match[1]) {
+            setCustomModelName(match[1]);
+          } else {
+            setCustomModelName('');
+          }
           setSku(p.sku);
           setIsSkuManuallyEdited(true);
           setBarcode(p.barcode);
@@ -253,6 +254,7 @@ export const ProductGeneratorView: React.FC = () => {
     setSelectedSizeId(undefined);
     setSelectedGenderId(undefined);
     setSelectedAgeId(undefined);
+    setCustomModelName('');
     setProductName('');
     setIsNameManuallyEdited(false);
     setSku('');
@@ -434,6 +436,23 @@ export const ProductGeneratorView: React.FC = () => {
               catalogType="attribute"
             />
 
+            {/* نام / مدل محصول (داخل پرانتز) */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                <span>نام محصول (مدل / طرح)</span>
+                <span className="text-[10px] text-blue-600 font-normal">درج داخل پرانتز</span>
+              </label>
+              <Input
+                value={customModelName}
+                onChange={(e) => {
+                  setCustomModelName(e.target.value);
+                  setIsNameManuallyEdited(false);
+                }}
+                placeholder="مثال: تدی، خرسی، اسپایدرمن..."
+                className="h-10 text-xs"
+              />
+            </div>
+
             {/* 4. رنگ */}
             <SearchableDropdown
               label="رنگ"
@@ -487,9 +506,14 @@ export const ProductGeneratorView: React.FC = () => {
             {/* 8. نام محصول (خودکار + ویرایش دستی) */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700">
-                  نام محصول <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-slate-700">
+                    نام محصول <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    (فرمت استاندارد: گروه اصلی + ویژگی + داخل پرانتز نام محصول)
+                  </span>
+                </div>
                 <div className="flex items-center gap-2">
                   {isNameManuallyEdited ? (
                     <span className="text-[11px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
@@ -497,7 +521,7 @@ export const ProductGeneratorView: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded">
-                      تولید خودکار
+                      تولید خودکار استاندارد
                     </span>
                   )}
                   {isNameManuallyEdited && (
@@ -518,7 +542,7 @@ export const ProductGeneratorView: React.FC = () => {
                   setProductName(e.target.value);
                   setIsNameManuallyEdited(true);
                 }}
-                placeholder="مثال: تیشرت چاپدار قرمز پسرانه سایز ۸"
+                placeholder="مثال: تیشرت چاپدار (تدی)"
                 required
               />
             </div>

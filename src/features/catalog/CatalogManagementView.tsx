@@ -29,6 +29,7 @@ import {
   Calendar,
   Sun,
   Sparkles,
+  Search,
 } from 'lucide-react';
 
 export const CatalogManagementView: React.FC = () => {
@@ -52,9 +53,11 @@ export const CatalogManagementView: React.FC = () => {
   const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogType>('category');
   const [selectedParentCategoryFilter, setSelectedParentCategoryFilter] = useState<string>('all');
   const [isTableLoading, setIsTableLoading] = useState(false);
+  const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
 
   const handleTabChange = (tabId: CatalogType) => {
     if (tabId === activeCatalogTab) return;
+    setCatalogSearchTerm('');
     setIsTableLoading(true);
     setActiveCatalogTab(tabId);
     setTimeout(() => {
@@ -123,6 +126,15 @@ export const CatalogManagementView: React.FC = () => {
   };
 
   const currentItems = getItemsForCurrentTab();
+
+  const filteredItems = currentItems.filter((item) => {
+    if (!catalogSearchTerm.trim()) return true;
+    const term = catalogSearchTerm.trim().toLowerCase();
+    return (
+      item.name.toLowerCase().includes(term) ||
+      (item.code && item.code.toLowerCase().includes(term))
+    );
+  });
 
   const handleOpenAddModal = () => {
     setEditingItem(null);
@@ -342,27 +354,54 @@ export const CatalogManagementView: React.FC = () => {
         })}
       </div>
 
-      {/* Subcategory Parent Filter */}
-      {activeCatalogTab === 'subcategory' && (
-        <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 text-xs">
-          <span className="font-semibold text-slate-700 shrink-0">فیلتر بر اساس گروه اصلی:</span>
-          <div className="w-56">
-            <CustomDropdown
-              size="sm"
-              value={selectedParentCategoryFilter}
-              onChange={(val) => handleFilterChange(val)}
-              options={[
-                { value: 'all', label: 'همه گروه‌ها' },
-                ...categories.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                  code: c.code,
-                })),
-              ]}
-            />
-          </div>
+      {/* Subcategory Parent Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder={`جستجو در بین ${currentItems.length} ${currentTabInfo?.label}...`}
+            value={catalogSearchTerm}
+            onChange={(e) => setCatalogSearchTerm(e.target.value)}
+            className="w-full pr-9 pl-3 py-2 text-xs rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-2xs"
+          />
+          {catalogSearchTerm && (
+            <button
+              onClick={() => setCatalogSearchTerm('')}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
-      )}
+
+        <div className="flex items-center gap-3">
+          {activeCatalogTab === 'subcategory' && (
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+              <span className="font-semibold text-slate-600 shrink-0 text-[11px]">گروه والد:</span>
+              <div className="w-48">
+                <CustomDropdown
+                  size="sm"
+                  value={selectedParentCategoryFilter}
+                  onChange={(val) => handleFilterChange(val)}
+                  options={[
+                    { value: 'all', label: 'همه گروه‌ها' },
+                    ...categories.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      code: c.code,
+                    })),
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
+          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 shrink-0">
+            {filteredItems.length} از {currentItems.length} مورد
+          </span>
+        </div>
+      </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -425,17 +464,17 @@ export const CatalogManagementView: React.FC = () => {
                     </td>
                   </tr>
                 ))
-              ) : currentItems.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={activeCatalogTab === 'subcategory' || activeCatalogTab === 'color' ? 7 : 6}
                     className="p-8 text-center text-slate-400"
                   >
-                    هیچ داده‌ای در این بخش وجود ندارد
+                    هیچ داده‌ای در این بخش یافت نشد
                   </td>
                 </tr>
               ) : (
-                currentItems.map((item, idx) => {
+                filteredItems.map((item, idx) => {
                   let parentName = '';
                   if (activeCatalogTab === 'subcategory') {
                     const sub = item as SubCategory;
